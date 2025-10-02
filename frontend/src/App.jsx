@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import Shell from "./components/Shell";
-import Header from "./components/header";
+import Header from "./components/Header";
 import MessageList from "./components/MessageList";
 import Bubble from "./components/Bubble";
 import ChatInput from "./components/ChatInput";
