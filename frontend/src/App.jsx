@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useEffect, useRef, useState } from "react";
 
-import Shell from "./components/shell";
+import Shell from "./components/Shell";
 import Header from "./components/header";
 import MessageList from "./components/MessageList";
 import Bubble from "./components/Bubble";
