@@ -14,15 +14,15 @@ export default function ChatInput({ onSend }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-zinc-200 dark:border-zinc-700 bg-[#f5f5dc] dark:bg-zinc-900 p-3 flex items-center gap-2"
+      className="border-t border-zinc-200 bg-[#f5f5dc] p-3 flex items-center gap-2"
     >
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Type your message..."
         rows={2}
-        className="flex-1 resize-none rounded-lg border border-zinc-300 dark:border-zinc-700
-                   bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100
+        className="flex-1 resize-none rounded-lg border border-zinc-300
+                   bg-white px-3 py-2 text-sm text-zinc-800
                    placeholder:text-zinc-400 focus:outline-none focus:ring-2
                    focus:ring-[#660000]"
       />

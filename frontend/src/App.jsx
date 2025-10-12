@@ -90,7 +90,7 @@ export default function App() {
   function skipCurrent() {
     skipRef.current = true;
     if (stage === "analyze" || stage === "search" || stage === "think") {
-      setStage("write");
+      setStage("thinking");
     }
   }
 
@@ -286,7 +286,7 @@ export default function App() {
     stage !== "finalize";
 
   return (
-    <div className="min-h-screen bg-[#f5f5dc] text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+    <div className="min-h-screen bg-[#f5f5dc] text-zinc-900">
       <Shell>
         {/* Desktop sidebar */}
         <Sidebar
