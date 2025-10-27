@@ -2,7 +2,7 @@
 import React from "react";
 import botAvatar from "../assets/bot.jpeg";
 import userAvatar from "../assets/user.jpeg";
-import Linkify from "./linkify"; // ⬅️ use the shared component
+import Linkify from "./Linkify";
 
 export default function Bubble({ role = "bot", children, ts }) {
   const isUser = role === "user";
