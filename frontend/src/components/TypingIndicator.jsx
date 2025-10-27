@@ -4,9 +4,11 @@ const STAGE_TEXT = {
   analyze: "Analyzing your question",
   search: "Searching campus sources",
   think: "Thinking",
-  write: "Longer think → better answers",
+  write: "Longer think gives better answers",
   finalize: "Finishing up",
 };
+
+
 
 export default function TypingIndicator({ stage, onSkip }) {
   const [showTip, setShowTip] = useState(false);
@@ -46,7 +48,7 @@ export default function TypingIndicator({ stage, onSkip }) {
         </span>
         {showTip && (
           <span className="ml-2 text-[11px] text-zinc-500">
-            Longer think → better answers
+            Longer think gives better answers
           </span>
         )}
       </div>
@@ -65,3 +67,4 @@ export default function TypingIndicator({ stage, onSkip }) {
     </div>
   );
 }
+
