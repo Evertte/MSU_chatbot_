@@ -2,7 +2,7 @@
 import React from "react";
 import botAvatar from "../assets/bot.jpeg";
 import userAvatar from "../assets/user.jpeg";
-import Linkify from "./Linkify";
+import Linkify from "./linkify";
 
 export default function Bubble({ role = "bot", children, ts }) {
   const isUser = role === "user";
