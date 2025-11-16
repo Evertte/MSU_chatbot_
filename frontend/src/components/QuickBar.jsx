@@ -1,5 +1,5 @@
 export default function QuickBar({ onPick }) {
-  // simple preset suggestions — you can change these later
+  // simple preset suggestions — you can change these later       
   const items = [
     "When is the next football game?",
     "Dining hall hours today",
