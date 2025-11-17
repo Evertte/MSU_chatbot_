@@ -1,6 +1,6 @@
 # Conversational AI Frontend
 
-This is a frontend for a conversational AI project, built using React, Tailwind CSS and Vite.
+This is a frontend for a conversational AI Agent project, built using React, Tailwind CSS and Vite.
 
 ## Features
 
