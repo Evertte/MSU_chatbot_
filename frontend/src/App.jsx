@@ -10,7 +10,6 @@ import TypingIndicator from "./components/TypingIndicator";
 import FollowUpHint from "./components/FollowUpHint";
 
 import Sidebar from "./components/Sidebar";
-import SidebarDrawer from "./components/SidebarDrawer";
 import ExpandFab from "./components/ExpandFab";
 
 import useConversations from "./hooks/useConversations";
@@ -295,11 +294,20 @@ export default function App() {
           onToggleCollapse={() => setSidebarCollapsed(v => !v)}
           width={sidebarWidth}
           onResizeStart={beginResize}
+          open={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
+        <div
+          className={[
+            "fixed inset-0 z-30 bg-black/40 transition-opacity lg:hidden",
+            sidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+          ].join(" ")}
+          onClick={() => setSidebarOpen(false)}
         />
 
         {/* Chat pane */}
         <div className="flex-1 min-w-0 min-h-0 grid grid-rows-[auto,1fr,auto] bg-transparent">
-          <Header />
+          <Header onToggleSidebar={() => setSidebarOpen(open => !open)} />
           <MessageList>
             {selected.messages.map(m => (
               <Bubble key={m.id} role={m.role} ts={m.ts}>
@@ -312,19 +320,6 @@ export default function App() {
           </MessageList>
           <ChatInput onSend={handleSend} />
         </div>
-
-        {/* Mobile drawer */}
-        <SidebarDrawer
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          conversations={conversations}
-          selectedId={selectedId}
-          onSelect={(id) => { selectConversation(id); setSidebarOpen(false); }}
-          onNew={() => { newConversation(); setSidebarOpen(false); }}
-          onDelete={deleteConversation}
-          onPin={togglePin}
-          onPick={(q) => handleSend(q)} // if your drawer ignores this, it's harmless
-        />
 
         {/* Floating expand (desktop) */}
         {sidebarCollapsed && !sidebarOpen && (
