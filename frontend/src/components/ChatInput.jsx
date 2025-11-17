@@ -4,11 +4,22 @@ import { useState } from "react";
 export default function ChatInput({ onSend }) {
   const [text, setText] = useState("");
 
-  function handleSubmit(e) {
+  function sendMessage(e) {
     e.preventDefault();
     if (!text.trim()) return;
     onSend(text.trim());
     setText("");
+
+  }
+
+  function handleSubmit(e) {
+    sendMessage(e);
+  }
+
+    function handleKeyDown(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        sendMessage(e);
+      }
   }
 
   return (
@@ -19,6 +30,7 @@ export default function ChatInput({ onSend }) {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
+        onKeyDown={handleKeyDown}
         placeholder="Type your message..."
         rows={2}
         className="flex-1 resize-none rounded-lg border border-zinc-300
