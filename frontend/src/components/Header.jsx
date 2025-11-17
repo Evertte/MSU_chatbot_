@@ -42,7 +42,7 @@ export default function Header({ onToggleSidebar }) {
         {/* Mobile hamburger */}
         <button
           type="button"
-          className="mr-2 rounded-lg border border-[#660000]/30 px-2 py-1 text-[#660000] md:hidden"
+          className="mr-2 rounded-lg border border-[#660000]/30 px-2 py-1 text-[#660000] lg:hidden"
           onClick={onToggleSidebar}
         >
           ☰
