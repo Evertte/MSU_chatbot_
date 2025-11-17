@@ -19,4 +19,4 @@ This is a frontend for a conversational AI Agent project, built using React, Tai
 
 ## Configuration
 
-1. Create a `.env.local` file in the project root with the following content:
+
