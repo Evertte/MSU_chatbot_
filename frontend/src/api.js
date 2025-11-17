@@ -49,9 +49,16 @@ export async function sendChat({ history, legacyMessage, signal }) {
         body: JSON.stringify({ messages: toStructured(history) }),
         signal,
       });
-      const reply = data?.reply ?? data?.message ?? data?.answer ?? data?.text ?? "";
-      if (typeof reply !== "string") throw new Error("Invalid structured response shape");
-      return { data, reply, mode: "structured" };
+
+      const reply =
+        data?.reply ?? data?.message ?? data?.answer ?? data?.text ?? "";
+      if (typeof reply !== "string") {
+        throw new Error("Invalid structured response shape");
+      }
+
+      const links = data?.links ?? [];   // ✅ pull links out
+
+      return { data, reply, links, mode: "structured" };
     } catch (err) {
       console.warn("[sendChat] structured failed → legacy:", err.message);
     }
@@ -62,9 +69,15 @@ export async function sendChat({ history, legacyMessage, signal }) {
     body: JSON.stringify({ message: legacyMessage || flattenPrompt(history) }),
     signal,
   });
-  const reply = data?.message ?? data?.reply ?? data?.answer ?? data?.text ?? "";
-  return { data, reply, mode: "legacy" };
+
+  const reply =
+    data?.message ?? data?.reply ?? data?.answer ?? data?.text ?? "";
+
+  const links = data?.links ?? [];       // ✅ pull links out
+
+  return { data, reply, links, mode: "legacy" };
 }
+
 
 export async function summarizeChat({ history }) {
   if (!SUMMARY_ROUTE_OK) return clientSummary(history);

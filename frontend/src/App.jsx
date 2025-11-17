@@ -110,112 +110,119 @@ export default function App() {
   // turn shape:
   // { convoId, botId, userText, apiHistory, mode:'followup'|'new', path:'stream'|'fallback', controller, timers:[...] }
 
-  async function handleSend(text) {
-    const convoId = selectedId || newConversation();
+async function handleSend(text) {
+  const convoId = selectedId || newConversation();
 
-    // Previous messages (before this user turn) for follow-up detection
-    const prevMsgs = conversations.find(c => c.id === convoId)?.messages || [];
-    const clippedPrev = clipHistory(prevMsgs, 16);
+  // Previous messages (before this user turn) for follow-up detection
+  const prevMsgs = conversations.find(c => c.id === convoId)?.messages || [];
+  const clippedPrev = clipHistory(prevMsgs, 16);
 
-    // Decide follow-up vs new; craft legacy single-string payload for backend
-    const { isFollowUp, message: legacyMessageForBackend } = makeFollowUpPrompt(clippedPrev, text);
+  // Decide follow-up vs new; craft legacy single-string payload for backend
+  const { isFollowUp, message: legacyMessageForBackend } = makeFollowUpPrompt(clippedPrev, text);
 
-    // Display user's message
-    const userMsg = { id: crypto.randomUUID(), role: "user", text, ts: Date.now() };
-    addMessage(convoId, userMsg);
+  // Display user's message
+  const userMsg = { id: crypto.randomUUID(), role: "user", text, ts: Date.now() };
+  addMessage(convoId, userMsg);
 
-    // Client-side history we keep (for summaries, and for future streaming support)
-    const apiHistory = clippedPrev.concat({ role: "user", text });
+  // Client-side history we keep (for summaries, and for future streaming support)
+  const apiHistory = clippedPrev.concat({ role: "user", text });
 
-    // Placeholder bot bubble
-    const botId = crypto.randomUUID();
-    addMessage(convoId, { id: botId, role: "bot", text: "", ts: Date.now() });
+  // Placeholder bot bubble
+  const botId = crypto.randomUUID();
+  addMessage(convoId, { id: botId, role: "bot", text: "", ts: Date.now() });
 
-    setStage("analyze");
+  setStage("analyze");
 
-    // Try streaming first (if enabled in api.js)
-    let streamedBuffer = "";
-    const streamController = new AbortController();
-    const streamed = await streamChat({
-      history: apiHistory,
-      onStage: (s) => setStage(mapStage(s)),
-      onToken: (chunk) => {
-        streamedBuffer += chunk;
-        patchMessage(convoId, botId, { text: streamedBuffer });
-      },
-      signal: streamController.signal,
-    });
+  // Try streaming first (if enabled in api.js)
+  let streamedBuffer = "";
+  const streamController = new AbortController();
+  const streamed = await streamChat({
+    history: apiHistory,
+    onStage: (s) => setStage(mapStage(s)),
+    onToken: (chunk) => {
+      streamedBuffer += chunk;
+      patchMessage(convoId, botId, { text: streamedBuffer });
+    },
+    signal: streamController.signal,
+  });
 
-    if (streamed?.streamed) {
-      setTurn(null);
-      setStage("finalize");
-      try {
-        const { title, summary } = await summarizeChat({
-          history: [...apiHistory, { role: "bot", text: streamedBuffer }],
-        });
-        setTitleSummary(convoId, { title, summary });
-      } finally {
-        setTimeout(() => setStage(null), 300);
-      }
-      return;
-    }
-
-    // Fallback: staged timers + abortable fetch for "Treat as new"
-    const t1 = setTimeout(() => setStage("search"), 500);
-    const t2 = setTimeout(() => setStage("think"), 1200);
-    const t3 = setTimeout(() => setStage("write"), 2200);
-    const fallbackController = new AbortController();
-
-    setTurn({
-      convoId,
-      botId,
-      userText: text,
-      apiHistory,
-      mode: isFollowUp ? "followup" : "new",
-      path: "fallback",
-      controller: fallbackController,
-      timers: [t1, t2, t3],
-    });
-
+  if (streamed?.streamed) {
+    setTurn(null);
+    setStage("finalize");
     try {
-      // Send with the legacy single-string payload your backend expects
-      const { reply } = await sendChat({
-        history: apiHistory,
-        legacyMessage: legacyMessageForBackend,
-        signal: fallbackController.signal,
-      });
-
-      // Clean stage timers
-      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
-      setStage("write");
-
-      await typeOut({
-        convoId,
-        msgId: botId,
-        fullText: reply || "…",
-        perCharMs: 12,
-        patchMessage,
-      });
-
-      setStage("finalize");
       const { title, summary } = await summarizeChat({
-        history: [...apiHistory, { role: "bot", text: reply || "" }],
+        history: [...apiHistory, { role: "bot", text: streamedBuffer }],
       });
       setTitleSummary(convoId, { title, summary });
-    } catch (err) {
-      if (err?.name === "AbortError") {
-        // aborted on purpose (Treat as new). UI flow will proceed in the retry.
-      } else {
-        console.error(err);
-        clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
-        setStage(null);
-        patchMessage(convoId, botId, { text: "Sorry—something went wrong talking to the server." });
-      }
     } finally {
-      // Clear stage a moment after finishing unless a retry is in flight
-      setTimeout(() => setStage(null), 400);
+      setTimeout(() => setStage(null), 300);
     }
+    return;
   }
+
+  // Fallback: staged timers + abortable fetch for "Treat as new"
+  const t1 = setTimeout(() => setStage("search"), 500);
+  const t2 = setTimeout(() => setStage("think"), 1200);
+  const t3 = setTimeout(() => setStage("write"), 2200);
+  const fallbackController = new AbortController();
+
+  setTurn({
+    convoId,
+    botId,
+    userText: text,
+    apiHistory,
+    mode: isFollowUp ? "followup" : "new",
+    path: "fallback",
+    controller: fallbackController,
+    timers: [t1, t2, t3],
+  });
+
+  try {
+    // 🔑 Get reply *and* links from backend
+    const { reply, links } = await sendChat({
+      history: apiHistory,
+      legacyMessage: legacyMessageForBackend,
+      signal: fallbackController.signal,
+    });
+
+    // Clean stage timers
+    clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+    setStage("write");
+
+    // Type the text into the existing bot bubble
+    await typeOut({
+      convoId,
+      msgId: botId,
+      fullText: reply || "…",
+      perCharMs: 12,
+      patchMessage,
+    });
+
+    // Attach links to that same message
+    if (links && links.length > 0) {
+      patchMessage(convoId, botId, { links });
+    }
+
+    setStage("finalize");
+    const { title, summary } = await summarizeChat({
+      history: [...apiHistory, { role: "bot", text: reply || "" }],
+    });
+    setTitleSummary(convoId, { title, summary });
+  } catch (err) {
+    if (err?.name === "AbortError") {
+      // aborted on purpose (Treat as new). UI flow will proceed in the retry.
+    } else {
+      console.error(err);
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      setStage(null);
+      patchMessage(convoId, botId, { text: "Sorry—something went wrong talking to the server." });
+    }
+  } finally {
+    // Clear stage a moment after finishing unless a retry is in flight
+    setTimeout(() => setStage(null), 400);
+  }
+}
+
 
   // Click handler for the inline hint: cancel current turn & resend as NEW
   async function treatCurrentAsNew() {
@@ -310,7 +317,7 @@ export default function App() {
           <Header onToggleSidebar={() => setSidebarOpen(open => !open)} />
           <MessageList>
             {selected.messages.map(m => (
-              <Bubble key={m.id} role={m.role} ts={m.ts}>
+              <Bubble key={m.id} role={m.role} ts={m.ts} links={m.links}>
                 {m.text}
               </Bubble>
             ))}
