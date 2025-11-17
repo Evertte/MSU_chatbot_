@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useEffect, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 
 import Shell from "./components/Shell";
 import Header from "./components/Header";
@@ -32,6 +32,11 @@ function mapStage(s) {
 }
 // ————————————————————————————————————————————————————————————————
 
+const WELCOME_TEXT =
+  "Hey Bulldog! How can I assist you today?\n" +
+  "If you have any questions about Mississippi State University, feel free to ask!\n\n" +
+  "Hail State! 🐶🏈";
+
 export default function App() {
   // Conversations store (titles, summaries, messages)
   const {
@@ -54,6 +59,20 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    const convo = conversations.find(c => c.id === selectedId);
+    if (!convo) return;
+
+    if (convo.messages.length === 0) {
+      addMessage(selectedId, {
+        id: crypto.randomUUID(),
+        role: "bot",
+        text: WELCOME_TEXT,
+        ts: Date.now(),
+      });
+    }
+  }, [selectConversation, conversations, selectedId, addMessage]);
   // Sidebar UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
