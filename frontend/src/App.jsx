@@ -103,16 +103,9 @@ export default function App() {
   }
   useEffect(() => () => endResize(), []);
 
-  // Stages + Skip
+  // Stages
   const [stage, setStage] = useState(null); // "analyze" | "search" | "think" | "write" | "finalize" | null
-  const skipRef = useRef(false);
-  function skipCurrent() {
-    skipRef.current = true;
-    if (stage === "analyze" || stage === "search" || stage === "think") {
-      setStage("thinking");
-    }
-  }
-
+  
   // Track the in-flight turn so we can "Treat as new"
   const [turn, setTurn] = useState(null);
   // turn shape:
@@ -120,7 +113,6 @@ export default function App() {
 
   async function handleSend(text) {
     const convoId = selectedId || newConversation();
-    skipRef.current = false;
 
     // Previous messages (before this user turn) for follow-up detection
     const prevMsgs = conversations.find(c => c.id === convoId)?.messages || [];
@@ -147,7 +139,7 @@ export default function App() {
     const streamController = new AbortController();
     const streamed = await streamChat({
       history: apiHistory,
-      onStage: (s) => setStage(skipRef.current ? "write" : mapStage(s)),
+      onStage: (s) => setStage(mapStage(s)),
       onToken: (chunk) => {
         streamedBuffer += chunk;
         patchMessage(convoId, botId, { text: streamedBuffer });
@@ -170,9 +162,9 @@ export default function App() {
     }
 
     // Fallback: staged timers + abortable fetch for "Treat as new"
-    const t1 = setTimeout(() => !skipRef.current && setStage("search"), 500);
-    const t2 = setTimeout(() => !skipRef.current && setStage("think"), 1200);
-    const t3 = setTimeout(() => setStage("write"), skipRef.current ? 0 : 2200);
+    const t1 = setTimeout(() => setStage("search"), 500);
+    const t2 = setTimeout(() => setStage("think"), 1200);
+    const t3 = setTimeout(() => setStage("write"), 2200);
     const fallbackController = new AbortController();
 
     setTurn({
@@ -198,18 +190,13 @@ export default function App() {
       clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
       setStage("write");
 
-      if (skipRef.current) {
-        patchMessage(convoId, botId, { text: reply || "…" });
-      } else {
-        await typeOut({
-          convoId,
-          msgId: botId,
-          fullText: reply || "…",
-          perCharMs: 12,
-          patchMessage,
-          skipRef,
-        });
-      }
+      await typeOut({
+        convoId,
+        msgId: botId,
+        fullText: reply || "…",
+        perCharMs: 12,
+        patchMessage,
+      });
 
       setStage("finalize");
       const { title, summary } = await summarizeChat({
@@ -265,18 +252,6 @@ export default function App() {
       clearTimeout(r1); clearTimeout(r2); clearTimeout(r3);
       setStage("write");
 
-      if (skipRef.current) {
-        patchMessage(t.convoId, t.botId, { text: reply || "…" });
-      } else {
-        await typeOut({
-          convoId: t.convoId,
-          msgId: t.botId,
-          fullText: reply || "…",
-          perCharMs: 12,
-          patchMessage,
-          skipRef,
-        });
-      }
 
       setStage("finalize");
       const { title, summary } = await summarizeChat({
@@ -332,7 +307,7 @@ export default function App() {
               </Bubble>
             ))}
             {/* Typing status + inline follow-up hint */}
-            <TypingIndicator stage={stage} onSkip={skipCurrent} />
+            <TypingIndicator stage={stage} />
             <FollowUpHint visible={showFollowUpHint} onTreatAsNew={treatCurrentAsNew} />
           </MessageList>
           <ChatInput onSend={handleSend} />

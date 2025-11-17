@@ -9,11 +9,9 @@ const STAGE_TEXT = {
 };
 
 
-
-export default function TypingIndicator({ stage, onSkip }) {
+ 
+export default function TypingIndicator({ stage }) {
   const [showTip, setShowTip] = useState(false);
-  const showSkip = stage === "analyze" || stage === "search" || stage === "think";
-
   useEffect(() => {
     if (stage === "think") {
       const t = setTimeout(() => setShowTip(true), 2500);
@@ -21,17 +19,6 @@ export default function TypingIndicator({ stage, onSkip }) {
     }
     setShowTip(false);
   }, [stage]);
-
-  // Keyboard shortcut: S or Esc to skip
-  useEffect(() => {
-    if (!showSkip || !onSkip) return;
-    const onKey = (e) => {
-      const k = e.key?.toLowerCase?.() || "";
-      if (k === "s" || k === "escape") onSkip();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [showSkip, onSkip]);
 
   if (!stage) return null;
   const label = STAGE_TEXT[stage] || "Working";
@@ -52,18 +39,6 @@ export default function TypingIndicator({ stage, onSkip }) {
           </span>
         )}
       </div>
-
-      {showSkip && onSkip && (
-        <button
-          type="button"
-          onClick={onSkip}
-          className="rounded-full bg-zinc-900 px-3 py-1.5 text-[11px] font-medium text-white shadow hover:opacity-90 dark:bg-zinc-700"
-          title="Skip wait (S or Esc)"
-          aria-label="Skip wait"
-        >
-          Skip
-        </button>
-      )}
     </div>
   );
 }
