@@ -130,6 +130,11 @@ export default function Sidebar({
 
   function Item({ c }) {
     const isActive = c.id === selectedId;
+    const pinnedTag = c.pinned ? (
+      <span className="rounded-full bg-[#800000] text-white text-[10px] px-2 py-0.5">
+        Pinned
+      </span>
+    ) : null;
     return (
       <button
         onClick={() => onSelect(c.id)}
@@ -155,8 +160,9 @@ export default function Sidebar({
               {c.title || "New conversation"}
             </div>
             {!collapsed && (
-              <div className="mt-0.5 text-xs text-zinc-500 max-h-10 overflow-hidden">
-                {c.summary || "No summary yet"}
+              <div className="mt-0.5 text-xs text-zinc-500 max-h-10 overflow-hidden space-y-1">
+                {pinnedTag}
+                <div>{c.summary || "No summary yet"}</div>
               </div>
             )}
           </div>
