@@ -26,6 +26,11 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh })
     return out.trim();
   }
 
+  // Hide empty bot placeholders until some text is present
+  if (!isUser && (!text || !text.trim())) {
+    return null;
+  }
+
   if (isUser) {
     return (
       <div className="flex items-end gap-2 justify-end">
