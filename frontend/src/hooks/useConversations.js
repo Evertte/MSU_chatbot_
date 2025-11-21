@@ -31,6 +31,7 @@ export default function useConversations() {
       id,
       title: "New conversation",
       summary: "",
+      conversationId: null,
       pinned: false,
       updatedAt: now(),
       messages: [],
@@ -89,6 +90,16 @@ export default function useConversations() {
     );
   }
 
+  function setConversationBackendId(id, conversationId) {
+    setConversations((cs) =>
+      cs.map((c) =>
+        c.id === id
+          ? { ...c, conversationId: conversationId ?? null, updatedAt: now() }
+          : c
+      )
+    );
+  }
+
   function setTitleSummary(id, { title, summary }) {
     setConversations((cs) =>
       cs.map((c) =>
@@ -117,5 +128,6 @@ export default function useConversations() {
     patchMessage,
     setTitleSummary,
     setSelectedId,
+    setConversationBackendId,
   };
 }

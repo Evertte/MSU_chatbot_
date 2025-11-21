@@ -24,7 +24,6 @@
 //   );
 // }
 
-import botAvatar from "../assets/bot.jpeg";
 import msuLogo from "../assets/msu.png";
 
 export default function Header({ onToggleSidebar }) {
@@ -42,18 +41,14 @@ export default function Header({ onToggleSidebar }) {
         {/* Mobile hamburger */}
         <button
           type="button"
-          className="mr-2 rounded-lg border border-[#660000]/30 px-2 py-1 text-[#660000] lg:hidden"
+          className="mr-2 rounded-lg border-2 border-[#660000] px-2.5 py-1.5 text-[#660000] bg-white shadow-sm lg:hidden"
           onClick={onToggleSidebar}
         >
           ☰
         </button>
 
-        <div className="shrink-0 rounded-xl bg-white p-1 ring-1 ring-[#660000]/25 shadow-sm">
-          <img
-            src={botAvatar}
-            alt="Assistant"
-            className="h-14 w-auto object-contain select-none"
-          />
+        <div className="shrink-0 rounded-full bg-[#660000] text-white h-14 w-14 flex items-center justify-center font-black tracking-[0.08em] text-xs border-2 border-[#4a0000] shadow-md select-none ring-1 ring-[#660000]/25">
+          MSU
         </div>
 
         <div className="min-w-0">

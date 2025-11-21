@@ -1,5 +1,5 @@
 // src/App.jsx
-import { use, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Shell from "./components/Shell";
 import Header from "./components/Header";
@@ -50,6 +50,7 @@ export default function App() {
     addMessage,
     patchMessage,
     setTitleSummary,
+    setConversationBackendId,
   } = useConversations();
 
   // Ensure at least one conversation exists
@@ -114,11 +115,13 @@ async function handleSend(text) {
   const convoId = selectedId || newConversation();
 
   // Previous messages (before this user turn) for follow-up detection
-  const prevMsgs = conversations.find(c => c.id === convoId)?.messages || [];
+  const prevConvo = conversations.find(c => c.id === convoId);
+  const prevMsgs = prevConvo?.messages || [];
+  const backendConversationId = prevConvo?.conversationId || null;
   const clippedPrev = clipHistory(prevMsgs, 16);
 
   // Decide follow-up vs new; craft legacy single-string payload for backend
-  const { isFollowUp, message: legacyMessageForBackend } = makeFollowUpPrompt(clippedPrev, text);
+  const { isFollowUp } = makeFollowUpPrompt(clippedPrev, text);
 
   // Display user's message
   const userMsg = { id: crypto.randomUUID(), role: "user", text, ts: Date.now() };
@@ -134,30 +137,34 @@ async function handleSend(text) {
   setStage("analyze");
 
   // Try streaming first (if enabled in api.js)
+  let streamed = { streamed: false };
   let streamedBuffer = "";
-  const streamController = new AbortController();
-  const streamed = await streamChat({
-    history: apiHistory,
-    onStage: (s) => setStage(mapStage(s)),
-    onToken: (chunk) => {
-      streamedBuffer += chunk;
-      patchMessage(convoId, botId, { text: streamedBuffer });
-    },
-    signal: streamController.signal,
-  });
+  if (backendConversationId) {
+    const streamController = new AbortController();
+    streamed = await streamChat({
+      history: apiHistory,
+      conversationId: backendConversationId,
+      onStage: (s) => setStage(mapStage(s)),
+      onToken: (chunk) => {
+        streamedBuffer += chunk;
+        patchMessage(convoId, botId, { text: streamedBuffer });
+      },
+      signal: streamController.signal,
+    });
 
-  if (streamed?.streamed) {
-    setTurn(null);
-    setStage("finalize");
-    try {
-      const { title, summary } = await summarizeChat({
-        history: [...apiHistory, { role: "bot", text: streamedBuffer }],
-      });
-      setTitleSummary(convoId, { title, summary });
-    } finally {
-      setTimeout(() => setStage(null), 300);
+    if (streamed?.streamed) {
+      setTurn(null);
+      setStage("finalize");
+      try {
+        const { title, summary } = await summarizeChat({
+          history: [...apiHistory, { role: "bot", text: streamedBuffer }],
+        });
+        setTitleSummary(convoId, { title, summary });
+      } finally {
+        setTimeout(() => setStage(null), 300);
+      }
+      return;
     }
-    return;
   }
 
   // Fallback: staged timers + abortable fetch for "Treat as new"
@@ -178,10 +185,11 @@ async function handleSend(text) {
   });
 
   try {
-    // 🔑 Get reply *and* links from backend
-    const { reply, links } = await sendChat({
+    // 🔑 Get answer *and* sources from backend
+    const { answer, sources, conversationId } = await sendChat({
       history: apiHistory,
-      legacyMessage: legacyMessageForBackend,
+      userMessage: text,
+      conversationId: backendConversationId,
       signal: fallbackController.signal,
     });
 
@@ -193,19 +201,21 @@ async function handleSend(text) {
     await typeOut({
       convoId,
       msgId: botId,
-      fullText: reply || "…",
+      fullText: answer || "…",
       perCharMs: 12,
       patchMessage,
     });
 
     // Attach links to that same message
-    if (links && links.length > 0) {
-      patchMessage(convoId, botId, { links });
+    if (sources && sources.length > 0) {
+      patchMessage(convoId, botId, { links: sources });
     }
+
+    if (conversationId) setConversationBackendId(convoId, conversationId);
 
     setStage("finalize");
     const { title, summary } = await summarizeChat({
-      history: [...apiHistory, { role: "bot", text: reply || "" }],
+      history: [...apiHistory, { role: "bot", text: answer || "" }],
     });
     setTitleSummary(convoId, { title, summary });
   } catch (err) {
@@ -249,9 +259,10 @@ async function handleSend(text) {
     const r3 = setTimeout(() => setStage("write"), 1600);
 
     try {
-      const { reply } = await sendChat({
+      const { answer, conversationId } = await sendChat({
         history: t.apiHistory,
-        legacyMessage: t.userText, // send raw user text as a brand-new topic
+        userMessage: t.userText, // send raw user text as a brand-new topic
+        conversationId: null, // explicitly start a fresh backend thread
         signal: retryController.signal,
       });
 
@@ -261,9 +272,11 @@ async function handleSend(text) {
 
       setStage("finalize");
       const { title, summary } = await summarizeChat({
-        history: [...t.apiHistory, { role: "bot", text: reply || "" }],
+        history: [...t.apiHistory, { role: "bot", text: answer || "" }],
       });
       setTitleSummary(t.convoId, { title, summary });
+
+      if (conversationId) setConversationBackendId(t.convoId, conversationId);
     } catch (err) {
       if (err?.name !== "AbortError") {
         console.error(err);
@@ -273,6 +286,59 @@ async function handleSend(text) {
     } finally {
       setTurn(null);
       setTimeout(() => setStage(null), 400);
+    }
+  }
+
+  // Refresh a bot message by re-running the prior user turn with same conversation_id
+  async function refreshBotMessage(botMsgId) {
+    if (!selected) return;
+    const convo = conversations.find(c => c.id === selectedId);
+    if (!convo) return;
+    const msgs = convo.messages;
+    const botIdx = msgs.findIndex(m => m.id === botMsgId);
+    if (botIdx <= 0) return;
+
+    // Find the most recent user message before this bot message
+    const userIdx = [...msgs.slice(0, botIdx)].reverse().findIndex(m => m.role === "user");
+    if (userIdx === -1) return;
+    const absoluteUserIdx = botIdx - 1 - userIdx;
+    const userMsg = msgs[absoluteUserIdx];
+
+    const clippedHistory = clipHistory(msgs.slice(0, absoluteUserIdx + 1), 16);
+    const apiHistory = clippedHistory.map(m => ({ role: m.role, text: m.text }));
+    const backendConversationId = convo.conversationId || null;
+
+    const refreshController = new AbortController();
+    setStage("analyze");
+    patchMessage(convo.id, botMsgId, { text: "Refreshing…", links: [] });
+
+    try {
+      const { answer, sources, conversationId } = await sendChat({
+        history: apiHistory,
+        userMessage: userMsg.text,
+        conversationId: backendConversationId,
+        signal: refreshController.signal,
+      });
+
+      await typeOut({
+        convoId: convo.id,
+        msgId: botMsgId,
+        fullText: answer || "…",
+        perCharMs: 12,
+        patchMessage,
+      });
+
+      if (sources && sources.length > 0) {
+        patchMessage(convo.id, botMsgId, { links: sources });
+      }
+      if (conversationId) setConversationBackendId(convo.id, conversationId);
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        console.error(err);
+        patchMessage(convo.id, botMsgId, { text: "Sorry—couldn't refresh this answer." });
+      }
+    } finally {
+      setStage(null);
     }
   }
 
@@ -317,7 +383,13 @@ async function handleSend(text) {
           <Header onToggleSidebar={() => setSidebarOpen(open => !open)} />
           <MessageList>
             {selected.messages.map(m => (
-              <Bubble key={m.id} role={m.role} ts={m.ts} links={m.links}>
+              <Bubble
+                key={m.id}
+                role={m.role}
+                ts={m.ts}
+                links={m.links}
+                onRefresh={m.role === "bot" ? () => refreshBotMessage(m.id) : undefined}
+              >
                 {m.text}
               </Bubble>
             ))}

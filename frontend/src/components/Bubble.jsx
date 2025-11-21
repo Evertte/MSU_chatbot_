@@ -73,7 +73,7 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh })
               {cleanBotText(text)}
             </div>
             {Array.isArray(links) && links.length > 0 && (
-              <div className="mt-2 text-[11px] text-slate-500">
+              <div className="mt-2 text-[11px] text-slate-600 font-semibold">
                 For more details, check the sources below.
               </div>
             )}
@@ -121,12 +121,11 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh })
               onClick={onRefresh}
               className="meta-btn flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[10px] text-slate-700"
             >
-              ⟳ <span>Refresh</span> <span className="ml-1 text-[10px] text-slate-400 uppercase tracking-[0.08em]">retype</span>
+              ⟳ <span>Refresh</span>
             </button>
+            {!!time && <span className="ml-1 text-[10px] text-slate-500">{time}</span>}
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {!!time && <span>{time}</span>}
-          </div>
+          <div />
         </div>
       </div>
     </div>

@@ -39,26 +39,35 @@ function flattenPrompt(history = []) {
   return `${turns.join("\n")}\nAssistant:`;
 }
 
-export async function sendChat({ history, legacyMessage, signal }) {
+function normalizeResponse(data = {}) {
+  const answer = data?.answer ?? data?.message ?? data?.reply ?? data?.text ?? "";
+  const sources = Array.isArray(data?.sources)
+    ? data.sources
+    : Array.isArray(data?.links)
+      ? data.links
+      : [];
+  const conversationId = data?.conversation_id ?? data?.conversationId ?? null;
+  return { answer, sources, conversationId };
+}
+
+export async function sendChat({ history, userMessage, conversationId, signal }) {
   const chatUrl = `${API_BASE}/api/chat`;
+  const basePayload = conversationId ? { conversation_id: conversationId } : {};
 
   if (TRY_STRUCTURED) {
     try {
       const data = await jsonFetch(chatUrl, {
         method: "POST",
-        body: JSON.stringify({ messages: toStructured(history) }),
+        body: JSON.stringify({ ...basePayload, messages: toStructured(history) }),
         signal,
       });
 
-      const reply =
-        data?.reply ?? data?.message ?? data?.answer ?? data?.text ?? "";
-      if (typeof reply !== "string") {
+      const { answer, sources, conversationId } = normalizeResponse(data);
+      if (typeof answer !== "string") {
         throw new Error("Invalid structured response shape");
       }
 
-      const links = data?.links ?? [];   // ✅ pull links out
-
-      return { data, reply, links, mode: "structured" };
+      return { data, answer, sources, conversationId, mode: "structured" };
     } catch (err) {
       console.warn("[sendChat] structured failed → legacy:", err.message);
     }
@@ -66,16 +75,16 @@ export async function sendChat({ history, legacyMessage, signal }) {
 
   const data = await jsonFetch(chatUrl, {
     method: "POST",
-    body: JSON.stringify({ message: legacyMessage || flattenPrompt(history) }),
+    body: JSON.stringify({
+      ...basePayload,
+      message: userMessage || flattenPrompt(history),
+    }),
     signal,
   });
 
-  const reply =
-    data?.message ?? data?.reply ?? data?.answer ?? data?.text ?? "";
+  const normalized = normalizeResponse(data);
 
-  const links = data?.links ?? [];       // ✅ pull links out
-
-  return { data, reply, links, mode: "legacy" };
+  return { data, ...normalized, mode: "legacy" };
 }
 
 
@@ -106,15 +115,16 @@ function clientSummary(history = []) {
   };
 }
 
-export async function streamChat({ history, onStage, onToken, signal }) {
+export async function streamChat({ history, conversationId, onStage, onToken, signal }) {
   if (!STREAM_ON) return { streamed: false };
 
   const url = `${API_BASE}/api/chat/stream`;
+  const basePayload = conversationId ? { conversation_id: conversationId } : {};
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: toStructured(history) }),
+      body: JSON.stringify({ ...basePayload, messages: toStructured(history) }),
       signal,
     });
     if (!res.ok || !res.body) throw new Error("No stream");
