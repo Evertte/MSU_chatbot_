@@ -80,10 +80,6 @@ export default function App() {
   const resizingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(320);
-<<<<<<< ours
-=======
-  const typingAbortRef = useRef(null);
->>>>>>> theirs
   const MIN_W = 200, MAX_W = 520;
 
   function beginResize(e) {
@@ -351,91 +347,12 @@ async function handleSend(text) {
     if (!convo) return;
     const msg = convo.messages.find(m => m.id === msgId && m.role === "user");
     if (!msg) return;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
-    abortTyping();
-    setEditing({ msgId, text: msg.text || "" });
-  }
-
-  function onEditChange(val) {
-    setEditing((e) => ({ ...e, text: val }));
-  }
->>>>>>> theirs
-=======
->>>>>>> theirs
-=======
->>>>>>> theirs
 
     const next = window.prompt("Edit your message:", msg.text || "");
     if (next == null) return;
     const trimmed = next.trim();
     if (!trimmed || trimmed === msg.text) return;
     patchMessage(convo.id, msgId, { text: trimmed, ts: Date.now() });
-<<<<<<< ours
-<<<<<<< ours
-=======
-=======
->>>>>>> theirs
-
-    // Truncate conversation after this message and regenerate the bot reply
-    const msgIdx = convo.messages.findIndex(m => m.id === msgId);
-    if (msgIdx === -1) return;
-    const kept = convo.messages.slice(0, msgIdx + 1);
-    const updated = kept.map((m, i) =>
-      i === msgIdx ? { ...m, text: trimmed, ts: Date.now() } : m
-    );
-    setMessages(convo.id, updated);
-    resendAfterEdit(convo.id, updated);
-  }
-
-  async function resendAfterEdit(convoId, messages) {
-    const convo = conversations.find(c => c.id === convoId);
-    if (!convo) return;
-    const backendConversationId = convo.conversationId || null;
-    const history = clipHistory(messages, 16).map((m) => ({
-      role: m.role,
-      text: m.text,
-    }));
-    const botId = crypto.randomUUID();
-    addMessage(convoId, { id: botId, role: "bot", text: "", ts: Date.now() });
-    setStage("analyze");
-
-    try {
-      const { answer, sources, conversationId } = await sendChat({
-        history,
-        userMessage: history[history.length - 1]?.text || "",
-        conversationId: backendConversationId,
-      });
-
-      await typeOut({
-        convoId,
-        msgId: botId,
-        fullText: answer || "…",
-        perCharMs: 12,
-        patchMessage,
-      });
-
-      if (sources && sources.length > 0) {
-        patchMessage(convoId, botId, { links: sources });
-      }
-      if (conversationId) setConversationBackendId(convoId, conversationId);
-
-      const { title, summary } = await summarizeChat({
-        history: [...history, { role: "bot", text: answer || "" }],
-      });
-      setTitleSummary(convoId, { title, summary });
-    } catch (err) {
-      console.error(err);
-      patchMessage(convoId, botId, { text: "Sorry—something went wrong refreshing this turn." });
-    } finally {
-      setStage(null);
-    }
->>>>>>> theirs
   }
 
   if (!selected) return null; // wait a tick for first convo to be created
