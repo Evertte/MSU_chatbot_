@@ -1,18 +1,25 @@
 // components/Bubble.jsx
-import React from "react";
+import React, { useState } from "react";
 import Linkify from "./Linkify";
 
-export default function Bubble({ role = "bot", children, ts, links, onRefresh }) {
+export default function Bubble({ role = "bot", children, ts, links, onRefresh, onEdit }) {
   const isUser = role === "user";
   const time = ts
     ? new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : "";
 
   const text = typeof children === "string" ? children : String(children ?? "");
+  const [copied, setCopied] = useState(false);
 
   function handleCopy() {
     if (!navigator?.clipboard) return;
-    navigator.clipboard.writeText(text).catch(() => {});
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      })
+      .catch(() => {});
   }
 
   function cleanBotText(raw) {
@@ -34,7 +41,7 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh })
   if (isUser) {
     return (
       <div className="flex items-end gap-2 justify-end">
-      <div className="flex flex-col items-end gap-1 max-w-[55%]">
+        <div className="flex flex-col items-end gap-1 max-w-[55%]">
           <div className="relative w-full">
             <div
               className={[
@@ -49,13 +56,24 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh })
           </div>
           <div className="flex items-center gap-2 text-[11px] text-slate-700">
             {!!time && <span>{time}</span>}
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex items-center gap-1 rounded-full border border-[#660000] bg-[#f5f5dc] px-2 py-0.5 text-[10px] text-[#660000] hover:bg-white"
-            >
-              ⧉ <span>Copy</span>
-            </button>
+            <div className="flex items-center gap-1.5 rounded-full border border-[#660000] bg-[#f5f5dc] px-2 py-0.5">
+              {onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="flex items-center justify-center rounded-full border border-[#660000] bg-white px-2 py-0.5 text-[13px] text-[#660000] hover:bg-[#fdf6f6]"
+                >
+                  ✎
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="flex items-center justify-center rounded-full border border-[#660000] bg-white px-2 py-0.5 text-[13px] text-[#660000] hover:bg-[#fdf6f6]"
+              >
+                {copied ? "✓" : "⧉"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -124,9 +142,9 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh })
             <button
               type="button"
               onClick={onRefresh}
-              className="meta-btn flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[10px] text-slate-700"
+              className="meta-btn flex items-center justify-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[16px] text-slate-700"
             >
-              ⟳ <span>Refresh</span>
+              ⟳
             </button>
             {!!time && <span className="ml-1 text-[10px] text-slate-500">{time}</span>}
           </div>
