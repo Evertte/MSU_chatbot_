@@ -105,8 +105,8 @@ export async function summarizeChat({ history }) {
     return clientSummary(history);
   }
 }
-
 function clientSummary(history = []) {
+
   const firstUser = history.find((m) => m.role === "user")?.text || "New conversation";
   const lastBot = [...history].reverse().find((m) => m.role === "bot")?.text || "";
   return {

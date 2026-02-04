@@ -1,6 +1,12 @@
 // src/hooks/useConversations.js
 import { useEffect, useMemo, useState } from "react";
 
+function safeId() {
+  // crypto.randomUUID is best; fallback to time+random if unavailable
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function load() {
   try {
     return JSON.parse(localStorage.getItem("conversations") || "[]");
@@ -26,7 +32,7 @@ export default function useConversations() {
   );
 
   function newConversation() {
-    const id = crypto.randomUUID();
+    const id = safeId();
     const convo = {
       id,
       title: "New conversation",

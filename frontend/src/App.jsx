@@ -104,6 +104,15 @@ export default function App() {
   }
   useEffect(() => () => endResize(), []);
 
+  // Guard for initial render before a conversation is selected/created
+  if (!selected) {
+    return (
+      <div className="min-h-screen bg-[#f5f5dc] text-zinc-900 flex items-center justify-center">
+        <p className="text-sm text-zinc-600">Loading conversation…</p>
+      </div>
+    );
+  }
+
   // Stages
   const [stage, setStage] = useState(null); // "analyze" | "search" | "think" | "write" | "finalize" | null
   
