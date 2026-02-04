@@ -10,11 +10,13 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh, o
 
   const text = typeof children === "string" ? children : String(children ?? "");
   const [copied, setCopied] = useState(false);
+  const displayText = isUser ? text : cleanBotText(text);
+  const copyText = isUser ? text : displayText;
 
   function handleCopy() {
-    if (!navigator?.clipboard) return;
+    if (!navigator?.clipboard || !copyText?.trim()) return;
     navigator.clipboard
-      .writeText(text)
+      .writeText(copyText)
       .then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 1200);
@@ -93,7 +95,7 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh, o
         <div className="relative">
           <div className="rounded-2xl border border-slate-200 bg-white text-slate-700 p-3 shadow-[0_10px_25px_rgba(0,0,0,0.12)]">
             <div className="text-[14px] leading-[1.5] whitespace-pre-wrap break-words">
-              {cleanBotText(text)}
+              {displayText}
             </div>
             {Array.isArray(links) && links.length > 0 && (
               <div className="mt-2 text-[11px] text-slate-600 font-semibold">
@@ -145,6 +147,13 @@ export default function Bubble({ role = "bot", children, ts, links, onRefresh, o
               className="meta-btn flex items-center justify-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[16px] text-slate-700"
             >
               ⟳
+            </button>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="meta-btn flex items-center justify-center rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[14px] text-slate-700"
+            >
+              {copied ? "✓" : "⧉"}
             </button>
             {!!time && <span className="ml-1 text-[10px] text-slate-500">{time}</span>}
           </div>

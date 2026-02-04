@@ -51,6 +51,7 @@ export default function App() {
     patchMessage,
     setTitleSummary,
     setConversationBackendId,
+    replaceMessages,
   } = useConversations();
 
   // Ensure at least one conversation exists
@@ -139,32 +140,38 @@ async function handleSend(text) {
   // Try streaming first (if enabled in api.js)
   let streamed = { streamed: false };
   let streamedBuffer = "";
-  if (backendConversationId) {
-    const streamController = new AbortController();
-    streamed = await streamChat({
-      history: apiHistory,
-      conversationId: backendConversationId,
-      onStage: (s) => setStage(mapStage(s)),
-      onToken: (chunk) => {
-        streamedBuffer += chunk;
-        patchMessage(convoId, botId, { text: streamedBuffer });
-      },
-      signal: streamController.signal,
-    });
+  const streamController = new AbortController();
+  streamed = await streamChat({
+    history: apiHistory,
+    userMessage: text,
+    conversationId: backendConversationId,
+    onStage: (s) => setStage(mapStage(s)),
+    onToken: (chunk) => {
+      if (!streamedBuffer) setStage("write");
+      streamedBuffer += chunk;
+      patchMessage(convoId, botId, { text: streamedBuffer });
+    },
+    signal: streamController.signal,
+  });
 
-    if (streamed?.streamed) {
-      setTurn(null);
-      setStage("finalize");
-      try {
-        const { title, summary } = await summarizeChat({
-          history: [...apiHistory, { role: "bot", text: streamedBuffer }],
-        });
-        setTitleSummary(convoId, { title, summary });
-      } finally {
-        setTimeout(() => setStage(null), 300);
-      }
-      return;
+  if (streamed?.streamed) {
+    setTurn(null);
+    if (streamed.sources?.length) {
+      patchMessage(convoId, botId, { links: streamed.sources });
     }
+    if (streamed.conversationId) {
+      setConversationBackendId(convoId, streamed.conversationId);
+    }
+    setStage("finalize");
+    try {
+      const { title, summary } = await summarizeChat({
+        history: [...apiHistory, { role: "bot", text: streamedBuffer }],
+      });
+      setTitleSummary(convoId, { title, summary });
+    } finally {
+      setTimeout(() => setStage(null), 300);
+    }
+    return;
   }
 
   // Fallback: staged timers + abortable fetch for "Treat as new"
@@ -290,7 +297,8 @@ async function handleSend(text) {
   }
 
   // Refresh a bot message by re-running the prior user turn with same conversation_id
-  async function refreshBotMessage(botMsgId) {
+  async function refreshBotMessage(botMsgId, opts = {}) {
+    const { asNew = false } = opts;
     if (!selected) return;
     const convo = conversations.find(c => c.id === selectedId);
     if (!convo) return;
@@ -304,9 +312,14 @@ async function handleSend(text) {
     const absoluteUserIdx = botIdx - 1 - userIdx;
     const userMsg = msgs[absoluteUserIdx];
 
-    const clippedHistory = clipHistory(msgs.slice(0, absoluteUserIdx + 1), 16);
-    const apiHistory = clippedHistory.map(m => ({ role: m.role, text: m.text }));
-    const backendConversationId = convo.conversationId || null;
+    let apiHistory;
+    if (asNew) {
+      apiHistory = [{ role: "user", text: userMsg.text }];
+    } else {
+      const clippedHistory = clipHistory(msgs.slice(0, absoluteUserIdx + 1), 16);
+      apiHistory = clippedHistory.map(m => ({ role: m.role, text: m.text }));
+    }
+    const backendConversationId = asNew ? null : convo.conversationId || null;
 
     const refreshController = new AbortController();
     setStage("analyze");
@@ -342,17 +355,82 @@ async function handleSend(text) {
     }
   }
 
+  // Re-run the conversation from an edited user turn (drop later messages, keep prior history)
+  async function rerunFromEdit(convo, userMsg) {
+    const apiHistory = clipHistory(convo.messages, 16).map(m => ({ role: m.role, text: m.text }));
+    const backendConversationId = convo.conversationId || null;
+
+    const botId = crypto.randomUUID();
+    addMessage(convo.id, { id: botId, role: "bot", text: "", ts: Date.now() });
+
+    // Quick staged feel
+    const t1 = setTimeout(() => setStage("search"), 500);
+    const t2 = setTimeout(() => setStage("think"), 1200);
+    const t3 = setTimeout(() => setStage("write"), 2200);
+    const controller = new AbortController();
+
+    try {
+      setStage("analyze");
+      const { answer, sources, conversationId } = await sendChat({
+        history: apiHistory,
+        userMessage: userMsg.text,
+        conversationId: backendConversationId,
+        signal: controller.signal,
+      });
+
+      clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      setStage("write");
+
+      await typeOut({
+        convoId: convo.id,
+        msgId: botId,
+        fullText: answer || "…",
+        perCharMs: 12,
+        patchMessage,
+      });
+
+      if (sources && sources.length > 0) {
+        patchMessage(convo.id, botId, { links: sources });
+      }
+      if (conversationId) setConversationBackendId(convo.id, conversationId);
+
+      setStage("finalize");
+      const { title, summary } = await summarizeChat({
+        history: [...apiHistory, { role: "bot", text: answer || "" }],
+      });
+      setTitleSummary(convo.id, { title, summary });
+    } catch (err) {
+      if (err?.name !== "AbortError") {
+        console.error(err);
+        clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+        setStage(null);
+        patchMessage(convo.id, botId, { text: "Sorry—couldn't refresh this answer." });
+      }
+    } finally {
+      setTimeout(() => setStage(null), 400);
+    }
+  }
+
   function editUserMessage(msgId) {
     const convo = conversations.find(c => c.id === selectedId);
     if (!convo) return;
-    const msg = convo.messages.find(m => m.id === msgId && m.role === "user");
-    if (!msg) return;
+    const msgIdx = convo.messages.findIndex(m => m.id === msgId && m.role === "user");
+    if (msgIdx === -1) return;
+    const msg = convo.messages[msgIdx];
 
     const next = window.prompt("Edit your message:", msg.text || "");
     if (next == null) return;
     const trimmed = next.trim();
     if (!trimmed || trimmed === msg.text) return;
-    patchMessage(convo.id, msgId, { text: trimmed, ts: Date.now() });
+
+    const updatedMsg = { ...msg, text: trimmed, ts: Date.now() };
+    const preserved = convo.messages.slice(0, msgIdx).concat(updatedMsg);
+
+    // Drop all messages after the edited bubble
+    replaceMessages(convo.id, preserved);
+
+    // Re-run as a follow-up using history up to the edited turn; clear later replies
+    setTimeout(() => rerunFromEdit({ ...convo, messages: preserved }, updatedMsg), 0);
   }
 
   if (!selected) return null; // wait a tick for first convo to be created

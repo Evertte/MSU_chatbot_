@@ -100,6 +100,16 @@ export default function useConversations() {
     );
   }
 
+  function replaceMessages(id, nextMessages) {
+    setConversations((cs) =>
+      cs.map((c) =>
+        c.id === id
+          ? { ...c, messages: nextMessages, updatedAt: now() }
+          : c
+      )
+    );
+  }
+
   function setTitleSummary(id, { title, summary }) {
     setConversations((cs) =>
       cs.map((c) =>
@@ -129,5 +139,6 @@ export default function useConversations() {
     setTitleSummary,
     setSelectedId,
     setConversationBackendId,
+    replaceMessages,
   };
 }

@@ -115,16 +115,47 @@ function clientSummary(history = []) {
   };
 }
 
-export async function streamChat({ history, conversationId, onStage, onToken, signal }) {
+export async function streamChat({ history, userMessage, conversationId, onStage, onToken, signal }) {
   if (!STREAM_ON) return { streamed: false };
 
-  const url = `${API_BASE}/api/chat/stream`;
-  const basePayload = conversationId ? { conversation_id: conversationId } : {};
+  const url = `${API_BASE}/api/chat?stream=1`;
+  const payload = {
+    message: userMessage || history?.slice(-1)?.[0]?.text || flattenPrompt(history),
+  };
+  if (conversationId) payload.conversation_id = conversationId;
+
+  const processBuffer = (chunk, state) => {
+    const lines = chunk
+      .split("\n")
+      .filter((l) => l.startsWith("data:"))
+      .map((l) => l.slice(5).trim());
+    if (!lines.length) return null;
+    const dataStr = lines.join("\n");
+    if (!dataStr) return null;
+    let parsed;
+    try {
+      parsed = JSON.parse(dataStr);
+    } catch (err) {
+      console.warn("[streamChat] bad json chunk:", err.message);
+      return null;
+    }
+    const { answer_chunk, done, sources, conversation_id } = parsed;
+    if (answer_chunk) {
+      state.answer += answer_chunk;
+      onToken?.(answer_chunk);
+    }
+    if (Array.isArray(sources) && sources.length > 0) {
+      state.sources = sources;
+    }
+    if (conversation_id) state.conversationId = conversation_id;
+    return done === true;
+  };
+
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...basePayload, messages: toStructured(history) }),
+      body: JSON.stringify(payload),
       signal,
     });
     if (!res.ok || !res.body) throw new Error("No stream");
@@ -132,28 +163,29 @@ export async function streamChat({ history, conversationId, onStage, onToken, si
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
+    const state = { answer: "", sources: [], conversationId: conversationId || null };
     onStage?.("analyze");
+
+    const flush = () => {
+      const chunks = buf.split("\n\n");
+      buf = chunks.pop() || "";
+      for (const ch of chunks) {
+        const isDone = processBuffer(ch, state);
+        if (isDone) return true;
+      }
+      return false;
+    };
 
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const chunks = buf.split("\n\n");
-      buf = chunks.pop() || "";
-
-      for (const ch of chunks) {
-        let ev = "message", data = "";
-        for (const line of ch.split("\n")) {
-          if (line.startsWith("event:")) ev = line.slice(6).trim();
-          else if (line.startsWith("data:")) data += line.slice(5) + "\n";
-        }
-        data = data.trim();
-        if (ev === "stage") onStage?.(data);
-        else if (ev === "token") onToken?.(data);
-        else if (ev === "done") return { streamed: true };
+      buf += dec.decode(value || new Uint8Array(), { stream: !done });
+      if (flush()) break;
+      if (done) {
+        if (buf.trim()) flush();
+        break;
       }
     }
-    return { streamed: true };
+    return { streamed: true, answer: state.answer, sources: state.sources, conversationId: state.conversationId };
   } catch (e) {
     console.warn("[streamChat] stream failed:", e?.message || e);
     return { streamed: false, error: e };
