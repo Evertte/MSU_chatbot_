@@ -82,6 +82,12 @@ export default function App() {
   const startXRef = useRef(0);
   const startWidthRef = useRef(320);
   const MIN_W = 200, MAX_W = 520;
+  const [stage, setStage] = useState(null); // "analyze" | "search" | "think" | "write" | "finalize" | null
+  
+  // Track the in-flight turn so we can "Treat as new"
+  const [turn, setTurn] = useState(null);
+  // turn shape:
+  // { convoId, botId, userText, apiHistory, mode:'followup'|'new', path:'stream'|'fallback', controller, timers:[...] }
 
   function beginResize(e) {
     if (sidebarCollapsed) return;
@@ -112,14 +118,6 @@ export default function App() {
       </div>
     );
   }
-
-  // Stages
-  const [stage, setStage] = useState(null); // "analyze" | "search" | "think" | "write" | "finalize" | null
-  
-  // Track the in-flight turn so we can "Treat as new"
-  const [turn, setTurn] = useState(null);
-  // turn shape:
-  // { convoId, botId, userText, apiHistory, mode:'followup'|'new', path:'stream'|'fallback', controller, timers:[...] }
 
 async function handleSend(text) {
   const convoId = selectedId || newConversation();
@@ -441,8 +439,6 @@ async function handleSend(text) {
     // Re-run as a follow-up using history up to the edited turn; clear later replies
     setTimeout(() => rerunFromEdit({ ...convo, messages: preserved }, updatedMsg), 0);
   }
-
-  if (!selected) return null; // wait a tick for first convo to be created
 
   const showFollowUpHint =
     !!turn &&

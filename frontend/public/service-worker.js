@@ -1,9 +1,6 @@
-const CACHE_NAME = "chatbot-cache-v1";
+const CACHE_NAME = "chatbot-cache-v2";
 const ASSETS_TO_CACHE = [
-  "/",           // your chatbot entry
-  "/index.html",
-  "/main.js",    // adjust for your build
-  "/styles.css", // adjust for your build
+  "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];
@@ -30,8 +27,13 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Example: don't cache API calls to /api/chat
-  if (url.pathname.startsWith("/api/chat")) {
+  if (event.request.mode === "navigate" || url.pathname === "/" || url.pathname === "/index.html") {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // For chatbot API calls we want fresh data, not cache
+  if (url.pathname.startsWith("/api/")) {
     return; // let the network handle it
   }
 
