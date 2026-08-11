@@ -12,7 +12,7 @@ This is a frontend for a conversational AI Agent project, built using React, Tai
 
 ## Setup
 
-1. Clone the repository: `git clone https://github.com/your-username/your-repo-name.git`
+1. Clone the repository: `git clone https://github.com/evertte/MSU_chatbot_.git`
 2. Install the dependencies: `npm install`
 3. Start the development server: `npm run dev`
 4. Open the app in your browser at `http://localhost:3000`
